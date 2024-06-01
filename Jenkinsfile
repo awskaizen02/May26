@@ -17,10 +17,6 @@ triggers { pollSCM('* * * * *') }
                 bat "${params.MAVEN_GOAL}"
             }
         }
-        stage('deploy') {
-            steps {
-                deploy adapters: [tomcat9(credentialsId: 'web', path: '', url: 'http://localhost:9090/')], contextPath: 'pipe', war: '**/*.war'
-            }
-        }
+       
     }
 }
