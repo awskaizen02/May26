@@ -1,0 +1,55 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('SCM') {
+            steps {
+                git branch: 'war', url: 'https://github.com/awskaizen02/May26.git'
+            }
+        }
+	stage('Build') {
+            steps {
+                sh 'mvn clean'
+		sh 'mvn install'
+            }
+        }
+ 	stage('Docker Image') {
+            steps {
+		script{
+		 app = docker.build("dockerpandian/june10")
+		  app.inside{
+			  sh 'echo $(curl localhost:8080)'
+					}
+				}
+    }
+    }
+     stage('Push Docker Image') {
+            steps {
+				script{		
+					docker.withRegistry('https://registry.hub.docker.com', 'docker') {
+					   app.push("${env.BUILD_NUMBER}")
+					   app.push("latest")
+					}
+				}
+			}
+                            }
+    stage('Deploy to server') {
+    steps {
+	 input 'Deploy to Production?'
+	 milestone(1)
+				withCredentials([usernamePassword(credentialsId: 'deployer1', usernameVariable: 'USERNAME', passwordVariable: 'USERPASS')]) {
+			script{										
+			  sh "sshpass -p '$USERPASS' -v ssh -o StrictHostKeyChecking=no $USERNAME@$prod_ip \"docker pull dockerpandian/june10:${env.BUILD_NUMBER}\""
+			try{
+				sh "sshpass -p '$USERPASS' -v ssh -o StrictHostKeyChecking=no $USERNAME@$prod_ip \"docker stop demo-deploy\""
+			    sh "sshpass -p '$USERPASS' -v ssh -o StrictHostKeyChecking=no $USERNAME@$prod_ip \"docker rm  demo-deploy\""
+				 }  catch (err) {
+						echo: 'caught error: $err'
+				 }
+				 sh "sshpass -p '$USERPASS' -v ssh -o StrictHostKeyChecking=no $USERNAME@$prod_ip \"docker run --restart always --name demo-deploy -p 8080:8080 -d dockerpandian/june10:${env.BUILD_NUMBER}\""
+				 }
+				}
+			}
+				}                        
+    }
+}
